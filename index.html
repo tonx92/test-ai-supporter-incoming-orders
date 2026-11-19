@@ -35,6 +35,7 @@
       if (data.status === "ready") {
         document.querySelector("#display").textContent = `Тема: ${data.topic}\nЧерновик: ${data.draft}`;
       } else {
+        document.querySelector("#message").value = ''
         document.querySelector("#display").textContent = "Не удалось автоматически обработать заявку. Проверьте её вручную.";
       }
     });
