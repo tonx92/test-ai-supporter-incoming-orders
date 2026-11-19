@@ -25,8 +25,18 @@ async function handleTriage(request, response) {
     return json(response, 400, { status: "invalid_input" });
   }
 
-  const result = JSON.parse(await classify(text));
-  return json(response, 200, { status: "ready", ...result });
+  try {
+    const raw = await Promise.race([
+      classify(text),
+      new Promise((_, r) => setTimeout(r, 300, new Error())),
+    ]);
+    const result = JSON.parse(raw);
+    if (!["delivery", "pricing", "other"].includes(result.topic) || !result.draft?.trim())
+      return json(response, 200, { status: "manual_review", topic: null, draft: null });
+    return json(response, 200, { status: "ready", ...result });
+  } catch {
+    return json(response, 200, { status: "manual_review", topic: null, draft: null });
+  }
 }
 
 createServer(async (request, response) => {
