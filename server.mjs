@@ -12,9 +12,31 @@ function json(response, status, body) {
 async function handleTriage(request, response) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
-  const { text } = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  const result = JSON.parse(await classify(text));
-  return json(response, 200, { status: "ready", ...result });
+
+  let body;
+  try {
+    body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    return json(response, 400, { status: "invalid_input" });
+  }
+
+  const { text } = body ?? {};
+  if (typeof text !== "string" || text.length === 0) {
+    return json(response, 400, { status: "invalid_input" });
+  }
+
+  try {
+    const raw = await Promise.race([
+      classify(text),
+      new Promise((_, r) => setTimeout(r, 300, new Error())),
+    ]);
+    const result = JSON.parse(raw);
+    if (!["delivery", "pricing", "other"].includes(result.topic) || !result.draft?.trim())
+      return json(response, 200, { status: "manual_review", topic: null, draft: null });
+    return json(response, 200, { status: "ready", ...result });
+  } catch {
+    return json(response, 200, { status: "manual_review", topic: null, draft: null });
+  }
 }
 
 createServer(async (request, response) => {
